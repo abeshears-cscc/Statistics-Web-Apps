@@ -47,10 +47,15 @@
             font-size: 1.05rem;
         }
 
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
         .app-card {
             position: relative;
             display: flex;
-            width: min(100%, 680px);
             min-height: 210px;
             flex-direction: column;
             padding: 24px;
@@ -126,6 +131,10 @@
                 padding-top: 24px;
             }
 
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+
             .app-card {
                 min-height: 190px;
             }
@@ -137,12 +146,21 @@
         <h1>Statistics Web Apps</h1>
         <p class="subtitle">Interactive tools for exploring statistical concepts and probability.</p>
 
-        <a class="app-card" href="discrete-probability/index.html">
-            <span class="card-number">1</span>
-            <h2>Discrete Probability</h2>
-            <p>Explore simulations and tools for coin flips, binomial and Poisson distributions, and custom probability distributions.</p>
-            <div class="open-link">Browse probability apps <span aria-hidden="true">&rarr;</span></div>
-        </a>
+        <div class="card-grid">
+            <a class="app-card" href="discrete-probability/index.html">
+                <span class="card-number">1</span>
+                <h2>Discrete Probability</h2>
+                <p>Explore simulations and tools for coin flips, binomial and Poisson distributions, and custom probability distributions.</p>
+                <div class="open-link">Browse probability apps <span aria-hidden="true">&rarr;</span></div>
+            </a>
+
+            <a class="app-card" href="correllation/index.html">
+                <span class="card-number">2</span>
+                <h2>Correlation Explorer</h2>
+                <p>Explore the relationship between correlation strength, sample size, and statistical significance.</p>
+                <div class="open-link">Open correlation explorer <span aria-hidden="true">&rarr;</span></div>
+            </a>
+        </div>
     </main>
 </body>
 </html>

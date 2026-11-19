@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Correlation Explorer: r vs p</title>
+
+<style>
+
+body{
+    font-family:Arial,sans-serif;
+    max-width:1400px;
+    margin:20px auto;
+    padding:20px;
+    background:#f4f6f8;
+}
+
+h1{
+    color:#002E5D;
+}
+
+.controls{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:15px;
+}
+
+.control{
+    display:flex;
+    flex-direction:column;
+}
+
+label{
+    font-weight:bold;
+    margin-bottom:4px;
+}
+
+input[type=range]{
+    width:100%;
+}
+
+button{
+    padding:10px;
+    background:#00B140;
+    color:white;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#009137;
+}
+
+.dashboard{
+    margin-top:20px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:15px;
+}
+
+.card{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+.big{
+    font-size:1.8em;
+    font-weight:bold;
+}
+
+.equation{
+    color:#002E5D;
+    font-size:1.2em;
+    font-weight:bold;
+    overflow-wrap:anywhere;
+}
+
+canvas{
+    margin-top:20px;
+    background:white;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+
+.interpretation{
+    margin-top:20px;
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+.warning{
+    background:#fff8da;
+}
+
+.good{
+    background:#eaf9ef;
+}
+
+.strong{
+    background:#d8f7e2;
+}
+
+</style>
+</head>
+<body>
+
+<h1>Correlation Explorer: Relationship Between r and p</h1>
+
+<div class="controls">
+
+<div class="control">
+<label>Sample Size (n)</label>
+<input type="range" id="sampleSize" min="5" max="1000" value="50">
+<span id="sampleSizeValue">50</span>
+</div>
+
+<div class="control">
+<label>Population Correlation (ρ)</label>
+<input type="range" id="populationR" min="-95" max="95" value="50">
+<span id="populationRValue">0.50</span>
+</div>
+
+<div class="control">
+<label>Noise Scale (logarithmic)</label>
+<input type="range" id="noise" min="0" max="100" value="50">
+<span id="noiseValue">1.00×</span>
+</div>
+
+<div class="control">
+<label>&nbsp;</label>
+<button onclick="generateData()">
+Generate New Sample
+</button>
+</div>
+
+</div>
+
+<div class="dashboard">
+
+<div class="card">
+<div>Sample Correlation</div>
+<div id="rValue" class="big"></div>
+</div>
+
+<div class="card">
+<div>p-value</div>
+<div id="pValue" class="big"></div>
+</div>
+
+<div class="card">
+<div>r²</div>
+<div id="rSquared" class="big"></div>
+</div>
+
+<div class="card">
+<div>Variance Explained</div>
+<div id="explained" class="big"></div>
+</div>
+
+<div class="card">
+<div>Fitted Line Equation</div>
+<div id="lineEquation" class="equation" aria-live="polite"></div>
+</div>
+
+</div>
+
+<canvas id="scatterCanvas" width="1300" height="650"></canvas>
+
+<div id="interpretation" class="interpretation"></div>
+
+<script>
+
+const canvas =
+document.getElementById("scatterCanvas");
+
+const ctx =
+canvas.getContext("2d");
+
+let currentData=[];
+
+document.querySelectorAll("input")
+.forEach(el=>
+    el.addEventListener(
+        "input",
+        generateData
+    )
+);
+
+function randNormal(){
+
+    let u=0,v=0;
+
+    while(u===0)
+        u=Math.random();
+
+    while(v===0)
+        v=Math.random();
+
+    return Math.sqrt(-2*Math.log(u))
+        * Math.cos(2*Math.PI*v);
+}
+
+function generateData(){
+
+    const n =
+        parseInt(
+            document.getElementById(
+                "sampleSize"
+            ).value
+        );
+
+    const rho =
+        parseFloat(
+            document.getElementById(
+                "populationR"
+            ).value
+        ) / 100;
+
+    const noiseSliderValue =
+        parseFloat(
+            document.getElementById(
+                "noise"
+            ).value
+        );
+
+    const noise =
+        10 ** ((noiseSliderValue - 50) / 25);
+
+    document.getElementById(
+        "sampleSizeValue"
+    ).innerText=n;
+
+    document.getElementById(
+        "populationRValue"
+    ).innerText=rho.toFixed(2);
+
+    document.getElementById(
+        "noiseValue"
+    ).innerText=
+        noise.toFixed(2) + "×";
+
+    currentData=[];
+
+    for(let i=0;i<n;i++){
+
+        const x=
+            Math.tanh(randNormal());
+
+        const independentY =
+            Math.tanh(randNormal());
+        const effectiveRho =
+            rho /
+            Math.sqrt(
+                rho*rho +
+                (1-rho*rho)*noise*noise
+            );
+        const residualWeight =
+            Math.sqrt(
+                1-effectiveRho*effectiveRho
+            );
+        const weightTotal =
+            Math.abs(effectiveRho) +
+            residualWeight;
+        const y =
+            (
+                effectiveRho*x +
+                residualWeight*independentY
+            ) / weightTotal;
+
+        currentData.push({
+            x,y
+        });
+
+    }
+
+    analyze();
+    draw();
+}
+
+function correlation(data){
+
+    const n=data.length;
+
+    let sumX=0;
+    let sumY=0;
+
+    data.forEach(p=>{
+
+        sumX += p.x;
+        sumY += p.y;
+
+    });
+
+    const meanX=sumX/n;
+    const meanY=sumY/n;
+
+    let numerator=0;
+    let sx=0;
+    let sy=0;
+
+    data.forEach(p=>{
+
+        numerator +=
+            (p.x-meanX)
+            *
+            (p.y-meanY);
+
+        sx +=
+            Math.pow(
+                p.x-meanX,
+                2
+            );
+
+        sy +=
+            Math.pow(
+                p.y-meanY,
+                2
+            );
+
+    });
+
+    return numerator/
+    Math.sqrt(sx*sy);
+}
+
+function approximatePValue(r,n){
+
+    if(Math.abs(r)>=1)
+        return 0;
+
+    const t=
+        Math.abs(r)*
+        Math.sqrt(
+            (n-2)/
+            (1-r*r)
+        );
+
+    const p=
+        Math.exp(
+            -0.717*t
+            -
+            .416*t*t
+        );
+
+    return p;
+}
+
+function analyze(){
+
+    const n=
+        currentData.length;
+
+    const r=
+        correlation(
+            currentData
+        );
+
+    const p=
+        approximatePValue(
+            r,n
+        );
+
+    const r2=
+        r*r;
+
+    document.getElementById(
+        "rValue"
+    ).innerText=
+        r.toFixed(3);
+
+    document.getElementById(
+        "pValue"
+    ).innerText=
+        p<0.0001
+        ? "<0.0001"
+        : p.toFixed(4);
+
+    document.getElementById(
+        "rSquared"
+    ).innerText=
+        r2.toFixed(3);
+
+    document.getElementById(
+        "explained"
+    ).innerText=
+        (r2*100).toFixed(1)
+        + "%";
+
+    interpret(
+        r,p,n
+    );
+}
+
+function interpret(
+    r,p,n
+){
+
+    let html="";
+
+    const absR=
+        Math.abs(r);
+
+    let strength="";
+
+    if(absR<0.10)
+        strength=
+        "negligible";
+
+    else if(absR<0.30)
+        strength=
+        "weak";
+
+    else if(absR<0.50)
+        strength=
+        "moderate";
+
+    else if(absR<0.70)
+        strength=
+        "strong";
+
+    else
+        strength=
+        "very strong";
+
+    html += `
+    <h2>Interpretation</h2>
+
+    <p>
+    The observed correlation is
+    <strong>${r.toFixed(3)}</strong>
+    which represents a
+    <strong>${strength}</strong>
+    relationship.
+    </p>
+    `;
+
+    if(
+        p < .05 &&
+        absR < .20
+    ){
+
+        html += `
+        <div class="card warning">
+        <strong>
+        Statistically Significant,
+        but Practically Weak
+        </strong>
+
+        <p>
+        The p-value is small,
+        but the relationship
+        itself is weak.
+        This often happens when
+        sample sizes become very
+        large.
+        </p>
+        </div>
+        `;
+    }
+
+    if(
+        absR > .50 &&
+        p > .05
+    ){
+
+        html += `
+        <div class="card warning">
+        <strong>
+        Strong Relationship but
+        Limited Statistical Evidence
+        </strong>
+
+        <p>
+        The observed relationship
+        is substantial,
+        but the sample size may
+        be too small.
+        </p>
+        </div>
+        `;
+    }
+
+    if(
+        absR > .50 &&
+        p < .05
+    ){
+
+        html += `
+        <div class="card strong">
+        <strong>
+        Strong and Statistically Significant
+        </strong>
+
+        <p>
+        The relationship is both
+        meaningful and unlikely
+        to be due to chance.
+        </p>
+        </div>
+        `;
+    }
+
+    html += `
+    <p>
+    Variance explained:
+    ${(r*r*100).toFixed(1)}%.
+    </p>
+
+    <p>
+    Sample size:
+    ${n}.
+    </p>
+    `;
+
+    document.getElementById(
+        "interpretation"
+    ).innerHTML=html;
+}
+
+function draw(){
+
+    ctx.clearRect(
+        0,0,
+        canvas.width,
+        canvas.height
+    );
+
+    const centerX=
+        canvas.width/2;
+
+    const centerY=
+        canvas.height/2;
+
+    const maxAbsValue =
+        currentData.reduce(
+            (max, p) => Math.max(max, Math.abs(p.x), Math.abs(p.y)),
+            0
+        ) || 1;
+    const scale =
+        0.9 * Math.min(centerX, centerY) / maxAbsValue;
+    const gridStepX = centerX / scale / 5;
+    const gridStepY = centerY / scale / 5;
+
+    ctx.strokeStyle="#ddd";
+
+    for(let i=-5;i<=5;i++){
+
+        ctx.beginPath();
+        ctx.moveTo(
+            centerX+i*gridStepX*scale,
+            0
+        );
+        ctx.lineTo(
+            centerX+i*gridStepX*scale,
+            canvas.height
+        );
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(
+            0,
+            centerY+i*gridStepY*scale
+        );
+        ctx.lineTo(
+            canvas.width,
+            centerY+i*gridStepY*scale
+        );
+        ctx.stroke();
+    }
+
+    ctx.strokeStyle="black";
+
+    ctx.beginPath();
+    ctx.moveTo(0,centerY);
+    ctx.lineTo(
+        canvas.width,
+        centerY
+    );
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(centerX,0);
+    ctx.lineTo(
+        centerX,
+        canvas.height
+    );
+    ctx.stroke();
+
+    currentData.forEach(p=>{
+
+        const x=
+            centerX +
+            p.x*scale;
+
+        const y=
+            centerY -
+            p.y*scale;
+
+        ctx.fillStyle=
+            "#002E5D";
+
+        ctx.beginPath();
+
+        ctx.arc(
+            x,y,
+            4,
+            0,
+            Math.PI*2
+        );
+
+        ctx.fill();
+
+    });
+
+    const meanX =
+        currentData.reduce((sum, p) => sum + p.x, 0) /
+        currentData.length;
+    const meanY =
+        currentData.reduce((sum, p) => sum + p.y, 0) /
+        currentData.length;
+
+    let covariance = 0;
+    let varianceX = 0;
+
+    currentData.forEach(p => {
+        covariance += (p.x - meanX) * (p.y - meanY);
+        varianceX += (p.x - meanX) ** 2;
+    });
+
+    const slope = varianceX === 0 ? 0 : covariance / varianceX;
+    const intercept = meanY - slope * meanX;
+    const interceptSign = intercept < 0 ? "−" : "+";
+    document.getElementById("lineEquation").innerText =
+        `y = ${slope.toFixed(3)}x ${interceptSign} ${Math.abs(intercept).toFixed(3)}`;
+
+    const x1 = -centerX / scale;
+    const x2 = (canvas.width - centerX) / scale;
+    const y1 = intercept + slope * x1;
+    const y2 = intercept + slope * x2;
+
+    ctx.strokeStyle=
+        "#00B140";
+
+    ctx.lineWidth=3;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        centerX+x1*scale,
+        centerY-y1*scale
+    );
+
+    ctx.lineTo(
+        centerX+x2*scale,
+        centerY-y2*scale
+    );
+
+    ctx.stroke();
+
+    ctx.lineWidth=1;
+}
+
+generateData();
+
+</script>
+
+</body>
+</html>
