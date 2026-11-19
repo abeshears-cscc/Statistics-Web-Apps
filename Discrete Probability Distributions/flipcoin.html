@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coin Flip Binomial Simulator</title>
+
+<style>
+:root{
+    --green:#00B140;
+    --navy:#002E5D;
+    --forest:#215732;
+    --light:#f5f7fa;
+    --gray:#d9d9d9;
+}
+
+body{
+    font-family: Segoe UI, Arial, sans-serif;
+    margin:0;
+    padding:20px;
+    background:var(--light);
+    color:#222;
+}
+
+h1,h2{
+    color:var(--navy);
+}
+
+.container{
+    max-width:1400px;
+    margin:auto;
+}
+
+.controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+button{
+    background:var(--green);
+    color:white;
+    border:none;
+    padding:10px 16px;
+    font-size:16px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+button:hover{
+    filter:brightness(.92);
+}
+
+select{
+    padding:8px;
+    font-size:16px;
+}
+
+.dashboard{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+.panel{
+    background:white;
+    border-radius:12px;
+    padding:15px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+.current-trial{
+    min-height:180px;
+}
+
+.coin-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:20px;
+}
+
+.coin{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    font-weight:bold;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:white;
+    font-size:24px;
+    transform-style: preserve-3d;
+}
+
+.head{
+    background:var(--green);
+}
+
+.tail{
+    background:#777;
+}
+
+.flipping{
+    animation:flip .6s linear infinite;
+    background:gold;
+}
+
+@keyframes flip{
+    from{
+        transform:rotateY(0deg);
+    }
+    to{
+        transform:rotateY(360deg);
+    }
+}
+
+.stats{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+}
+
+.stat-card{
+    background:#f4f7fb;
+    padding:10px;
+    border-radius:8px;
+}
+
+#history{
+    max-height:500px;
+    overflow-y:auto;
+}
+
+.history-item{
+    border-bottom:1px solid #ddd;
+    padding:8px;
+}
+
+canvas{
+    width:100%;
+    height:450px;
+}
+
+table{
+    border-collapse:collapse;
+    width:100%;
+}
+
+th, td{
+    border:1px solid #ddd;
+    padding:6px;
+    text-align:center;
+}
+
+th{
+    background:var(--navy);
+    color:white;
+}
+
+.success-text{
+    color:var(--green);
+    font-weight:bold;
+}
+
+.legend{
+    display:flex;
+    gap:20px;
+    margin-bottom:10px;
+}
+
+.legend-item{
+    display:flex;
+    align-items:center;
+    gap:5px;
+}
+
+.legend-color{
+    width:18px;
+    height:18px;
+}
+
+@media(max-width:1000px){
+    .dashboard{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Coin Flip Binomial Simulator</h1>
+
+<div class="controls">
+
+<label>
+Number of Coins:
+<select id="coinCount">
+    <option>1</option>
+    <option>2</option>
+    <option>3</option>
+    <option>4</option>
+    <option selected>5</option>
+    <option>6</option>
+    <option>7</option>
+    <option>8</option>
+</select>
+</label>
+
+<button id="flipBtn">Flip Once</button>
+<button id="flip10Btn">Run 10 Trials</button>
+<button id="resetBtn">Reset</button>
+
+<label>
+<input type="checkbox" id="theoreticalToggle" >
+Show Theoretical Distribution
+</label>
+
+</div>
+
+<div class="stats">
+
+<div class="stat-card">
+<b>Trials</b>
+<div id="trialCount">0</div>
+</div>
+
+<div class="stat-card">
+<b>Observed Mean</b>
+<div id="obsMean">0</div>
+</div>
+
+<div class="stat-card">
+<b>Theoretical Mean</b>
+<div id="theoryMean">0</div>
+</div>
+
+<div class="stat-card">
+<b>Observed Std Dev</b>
+<div id="obsSD">0</div>
+</div>
+
+<div class="stat-card">
+<b>Theoretical Std Dev</b>
+<div id="theorySD">0</div>
+</div>
+
+</div>
+
+<br>
+
+<div class="dashboard">
+
+<div class="panel current-trial">
+
+<h2>Current Trial</h2>
+
+<div id="currentTrialText">
+Press "Flip Once" to begin.
+</div>
+
+<div id="coinDisplay" class="coin-row"></div>
+
+</div>
+
+<div class="panel">
+
+<h2>Success Frequency Table</h2>
+
+<table id="frequencyTable"></table>
+
+</div>
+
+<div class="panel">
+
+<h2>Histogram</h2>
+
+<div class="legend">
+<div class="legend-item">
+<div class="legend-color" style="background:#00B140"></div>
+Observed
+</div>
+
+<div class="legend-item">
+<div class="legend-color" style="background:#4F95FF"></div>
+Theoretical
+</div>
+</div>
+
+<canvas id="chart" width="700" height="450"></canvas>
+
+</div>
+
+<div class="panel">
+
+<h2>Trial History</h2>
+<div id="history"></div>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+let trialResults = [];
+let trialNumber = 0;
+
+const coinDisplay = document.getElementById("coinDisplay");
+const historyDiv = document.getElementById("history");
+
+function factorial(n){
+    if(n<=1) return 1;
+    let p=1;
+    for(let i=2;i<=n;i++) p*=i;
+    return p;
+}
+
+function combination(n,r){
+    return factorial(n)/(factorial(r)*factorial(n-r));
+}
+
+function binomialProbability(n,k,p=.5){
+    return combination(n,k)*(p**k)*((1-p)**(n-k));
+}
+
+function sleep(ms){
+    return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+async function runTrial(){
+
+    const n = Number(document.getElementById("coinCount").value);
+
+    coinDisplay.innerHTML="";
+
+    for(let i=0;i<n;i++){
+        const c=document.createElement("div");
+        c.className="coin flipping";
+        c.textContent="🪙";
+        coinDisplay.appendChild(c);
+    }
+
+    await sleep(900);
+
+    let successes=0;
+    let results=[];
+
+    coinDisplay.innerHTML="";
+
+    for(let i=0;i<n;i++){
+
+        const head=Math.random()<0.5;
+
+        results.push(head ? "H":"T");
+
+        if(head) successes++;
+
+        const coin=document.createElement("div");
+        coin.className="coin "+(head ? "head":"tail");
+        coin.textContent=head ? "H":"T";
+
+        coinDisplay.appendChild(coin);
+    }
+
+    trialNumber++;
+
+    trialResults.push(successes);
+
+    document.getElementById("currentTrialText").innerHTML=
+        `<b>Trial ${trialNumber}</b><br>
+        Successes (Heads): <span class='success-text'>${successes}</span>`;
+
+    const item=document.createElement("div");
+
+    item.className="history-item";
+
+    item.innerHTML=
+        `<b>Trial ${trialNumber}</b><br>
+        ${results.join(" ")}
+        <br>
+        Successes: <b>${successes}</b>`;
+
+    historyDiv.prepend(item);
+
+    updateSummary();
+}
+
+async function runTenTrials(){
+
+    document.getElementById("flipBtn").disabled=true;
+    document.getElementById("flip10Btn").disabled=true;
+
+    for(let i=0;i<10;i++){
+        await runTrial();
+        await sleep(150);
+    }
+
+    document.getElementById("flipBtn").disabled=false;
+    document.getElementById("flip10Btn").disabled=false;
+}
+
+function updateSummary(){
+
+    const n = Number(document.getElementById("coinCount").value);
+
+    let frequency=Array(n+1).fill(0);
+
+    trialResults.forEach(v=>frequency[v]++);
+
+    let table = "<tr><th>Successes</th>";
+
+    for(let k=0; k<=n; k++){
+        table += `<td>${k}</td>`;
+    }
+
+    table += "</tr>";
+
+    table += "<tr><th>Frequency</th>";
+
+    for(let k=0; k<=n; k++){
+        table += `<td>${frequency[k]}</td>`;
+    }
+
+    table += "</tr>";
+
+    document.getElementById("frequencyTable").innerHTML=table;
+
+    let mean=0;
+
+    if(trialResults.length){
+        mean=
+            trialResults.reduce((a,b)=>a+b,0)/
+            trialResults.length;
+    }
+
+    let sd=0;
+
+    if(trialResults.length>1){
+
+        sd=Math.sqrt(
+            trialResults.reduce((sum,x)=>
+                sum+(x-mean)**2,0
+            )/trialResults.length
+        );
+    }
+
+    document.getElementById("trialCount").textContent=
+        trialResults.length;
+
+    document.getElementById("obsMean").textContent=
+        mean.toFixed(3);
+
+    document.getElementById("obsSD").textContent=
+        sd.toFixed(3);
+
+    document.getElementById("theoryMean").textContent=
+        (n*0.5).toFixed(3);
+
+    document.getElementById("theorySD").textContent=
+        Math.sqrt(n*0.5*0.5).toFixed(3);
+
+    drawChart(frequency,n);
+}
+
+function drawChart(freq,n){
+
+    const canvas=document.getElementById("chart");
+    const ctx=canvas.getContext("2d");
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const margin=50;
+    const width=canvas.width-margin*2;
+    const height=canvas.height-margin*2;
+
+    const maxObserved=Math.max(1,...freq);
+
+    let theoretical=[];
+
+    for(let k=0;k<=n;k++){
+
+        theoretical.push(
+            binomialProbability(n,k,.5)*
+            Math.max(1,trialResults.length)
+        );
+    }
+
+    const maxTheory=Math.max(...theoretical);
+
+    const targetMaxY=Math.max(maxObserved,maxTheory)*1.2;
+    const rawTickStep=targetMaxY/5;
+    const tickMagnitude=10**Math.floor(Math.log10(rawTickStep));
+    const normalizedTickStep=rawTickStep/tickMagnitude;
+    const niceTickStep=
+        normalizedTickStep<=1 ? 1 :
+        normalizedTickStep<=2 ? 2 :
+        normalizedTickStep<=5 ? 5 : 10;
+    const yTickStep=Math.max(1,niceTickStep*tickMagnitude);
+    const maxY=Math.ceil(targetMaxY/yTickStep)*yTickStep;
+
+    const barWidth=width/(n+1);
+    const barInset=Math.min(5,barWidth*0.05);
+    const theoreticalBarWidth=Math.max(0,barWidth-2*barInset);
+    const observedBarWidth=theoreticalBarWidth*0.72;
+
+    ctx.strokeStyle="#000";
+
+    ctx.beginPath();
+    ctx.moveTo(margin,margin);
+    ctx.lineTo(margin,canvas.height-margin);
+    ctx.lineTo(canvas.width-margin,canvas.height-margin);
+    ctx.stroke();
+
+    for(let k=0;k<=n;k++){
+
+        const x=margin+k*barWidth+barInset;
+        const observedX=x+(theoreticalBarWidth-observedBarWidth)/2;
+
+        let barHeight=(freq[k]/maxY)*height;
+
+        if(document.getElementById("theoreticalToggle").checked){
+
+            let theoryHeight=
+                (theoretical[k]/maxY)*height;
+
+            ctx.fillStyle="rgba(79,149,255,.55)";
+
+            ctx.fillRect(
+                x,
+                canvas.height-margin-theoryHeight,
+                theoreticalBarWidth,
+                theoryHeight
+            );
+        }
+
+        ctx.fillStyle="#00B140";
+
+        ctx.fillRect(
+            observedX,
+            canvas.height-margin-barHeight,
+            observedBarWidth,
+            barHeight
+        );
+
+        ctx.fillStyle="#000";
+
+        ctx.fillText(
+            k,
+            x+theoreticalBarWidth/2,
+            canvas.height-margin+18
+        );
+
+        ctx.fillText(
+            freq[k],
+            observedX+observedBarWidth/2,
+            canvas.height-margin-barHeight-6
+        );
+    }
+
+    for(let value=0;value<=maxY;value+=yTickStep){
+
+        const y=
+            canvas.height-margin-
+            (value/maxY)*height;
+
+        ctx.strokeStyle="#ececec";
+
+        ctx.beginPath();
+        ctx.moveTo(margin,y);
+        ctx.lineTo(canvas.width-margin,y);
+        ctx.stroke();
+
+        ctx.fillStyle="#000";
+        ctx.textAlign="right";
+        ctx.fillText(value,margin-8,y+4);
+    }
+
+    ctx.fillStyle="#000";
+    ctx.textAlign="left";
+
+    ctx.fillText(
+        "Number of Heads",
+        canvas.width/2-40,
+        canvas.height-10
+    );
+
+    ctx.save();
+
+    ctx.translate(18,canvas.height/2);
+    ctx.rotate(-Math.PI/2);
+
+    ctx.fillText("Frequency",0,0);
+
+    ctx.restore();
+}
+
+function resetSimulation(){
+
+    trialResults=[];
+    trialNumber=0;
+
+    historyDiv.innerHTML="";
+    coinDisplay.innerHTML="";
+
+    document.getElementById("currentTrialText").innerHTML=
+        'Press "Flip Once" to begin.';
+
+    updateSummary();
+}
+
+document.getElementById("flipBtn")
+    .addEventListener("click",runTrial);
+
+document.getElementById("flip10Btn")
+    .addEventListener("click",runTenTrials);
+
+document.getElementById("resetBtn")
+    .addEventListener("click",resetSimulation);
+
+document.getElementById("coinCount")
+    .addEventListener("change",resetSimulation);
+
+document.getElementById("theoreticalToggle")
+    .addEventListener("change",updateSummary);
+
+resetSimulation();
+
+</script>
+
+</body>
+</html>
